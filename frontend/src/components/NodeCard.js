@@ -1,10 +1,10 @@
 // frontend/src/components/NodeCard.js
 import React from 'react';
 import {
-    Box, Heading, Text, VStack, SimpleGrid, Stat, StatLabel, StatNumber, Icon,
+    Box, Heading, Text, SimpleGrid, Stat, StatLabel, StatNumber, Icon,
     Divider, Flex, Badge, Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon
 } from '@chakra-ui/react';
-import { FaLaptop, FaMicrochip, FaShieldAlt, FaExclamationTriangle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import { FaLaptop, FaMicrochip, FaExclamationTriangle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 
 import GpuCard from './GpuCard';
 
@@ -14,14 +14,6 @@ function NodeCard({ node }) {
     const guardedStatusText = node.guard_running ? "守护中" : "未守护";
     const needsGuardColor = node.need_guard ? "orange" : "gray";
     const needsGuardText = node.need_guard ? "需要守护" : "状态正常";
-
-    // 这些变量现在将不会直接在 StatNumber 中显示，因为我们只显示 GPU 功率
-    // 但为了代码健壮性，仍然保留防御性检查，以防将来需要
-    const cpuUsage = (typeof node.cpu_usage === 'number') ? node.cpu_usage.toFixed(2) : 'N/A';
-    const memoryUsedGB = (typeof node.memory_used === 'number' && node.memory_used !== null) ? (node.memory_used / 1024).toFixed(1) : 'N/A';
-    const memoryTotalGB = (typeof node.memory_total === 'number' && node.memory_total !== null) ? (node.memory_total / 1024).toFixed(1) : 'N/A';
-    const averagePowerDraw = (typeof node.average_power_draw === 'number' && node.average_power_draw !== null) ? node.average_power_draw.toFixed(2) : 'N/A';
-
 
     return (
         <Box p={6} shadow="lg" borderWidth="1px" borderRadius="lg" bg="white">

@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-    Container, Heading, VStack, Text, Button, Spinner, Flex, Spacer, useToast, Box,
+    Container, Heading, Text, Button, Spinner, Flex, Spacer, useToast, Box,
     Stat, StatLabel, StatNumber, SimpleGrid, Icon, Select, Input, InputGroup, InputLeftElement,
     Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton,
     useDisclosure, FormControl, FormLabel, NumberInput, NumberInputField, NumberInputStepper,
     NumberIncrementStepper, NumberDecrementStepper, Switch, Stack, Badge,
     AlertDialog, AlertDialogBody, AlertDialogFooter, AlertDialogHeader, AlertDialogContent, AlertDialogOverlay
 } from '@chakra-ui/react';
-import { FaServer, FaMicrochip, FaShieldAlt, FaBolt, FaTachometerAlt, FaExclamationTriangle, FaSearch, FaCogs, FaRobot, FaCog, FaGlobe, FaMemory } from 'react-icons/fa';
+import { FaServer, FaMicrochip, FaShieldAlt, FaBolt, FaTachometerAlt, FaExclamationTriangle, FaSearch, FaRobot, FaCog } from 'react-icons/fa';
 
 import NodeCard from './components/NodeCard';
 import EventLog from './components/EventLog'; // 引入 EventLog 组件

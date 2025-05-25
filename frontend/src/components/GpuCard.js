@@ -3,7 +3,6 @@ import {
     Box,
     Text,
     Flex,
-    Spacer,
     Icon,
     Stat,
     StatLabel,
