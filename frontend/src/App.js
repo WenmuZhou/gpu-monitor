@@ -1,6 +1,6 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import {
-    Container, Text, Spinner, useToast, useDisclosure,
+    Container, Text, Spinner, useDisclosure,
     AlertDialog, AlertDialogBody, AlertDialogFooter, AlertDialogHeader, AlertDialogContent, AlertDialogOverlay,
     Button, SimpleGrid
 } from '@chakra-ui/react';
@@ -25,8 +25,6 @@ function App() {
         totalNodes, guardedNodes, needGuardNodes, totalGpus, averageTotalGpuPowerDraw, averageGpuUtilization,
         loadNodes, handleStartAllGuards, handleStopAllGuards
     } = useNodeMonitoring();
-
-    const toast = useToast();
 
     // Modal disclosure for SettingsModal
     const { isOpen: isSettingsModalOpen, onOpen: onSettingsModalOpen, onClose: onSettingsModalClose } = useDisclosure();

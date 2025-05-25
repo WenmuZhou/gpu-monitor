@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@chakra-ui/react';
 import { fetchNodes, startGuard, stopGuard, updateGuardPolicy } from '../services/api';
 
