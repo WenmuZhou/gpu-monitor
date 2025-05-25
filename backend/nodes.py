@@ -64,11 +64,12 @@ class GPU:
 
 class Node:
     # 一个在管理本机和远程机器的类，所有执行命令和文件操作相关的函数都需要支持本地和远程机器
-    def __init__(self, hostname: str, need_guard_interval=10):
+    def __init__(self, hostname: str, need_guard_interval=10, active_power_threshold=100):
         self.hostname = hostname
         self.gpus = []
         self.is_guard_running = False
         self.need_guard_interval = need_guard_interval # 分钟级别的死亡时间
+        self.active_power_threshold = active_power_threshold
 
         self.power_history = defaultdict(lambda: deque())
         self.is_local = self._check_is_local()
@@ -168,6 +169,10 @@ class Node:
         else:
             self.is_guard_running =  False
 
+    def update_guard_policy(self, need_guard_interval, active_power_threshold):
+        self.active_power_threshold = active_power_threshold
+        self.need_guard_interval = need_guard_interval
+
     def update(self):
         self.update_gpu_info()
         self.update_guard_status()
@@ -208,24 +213,25 @@ class Node:
             else:
                 logger.warning(f"[{self.hostname}] 守护进程终止失败")
 
-    def record_power(self, gpu_index: int, power_draw: float):
-        now = datetime.now()
-        history = self.power_history[gpu_index]
-        history.append((now, power_draw))
-
-        cutoff = now - timedelta(minutes=30)
-        while history and history[0][0] < cutoff:
-            history.popleft()
-
     def need_guard(self) -> bool:
+        now = datetime.now()  # 只计算一次当前时间
+
+        # 遍历所有 GPU
         for index, records in self.power_history.items():
-            recent = [p for t, p in records if t >= datetime.now() - timedelta(minutes=self.need_guard_interval)]
+            recent = [p for t, p in records if t >= now - timedelta(minutes=self.need_guard_interval)]
+
+            # 如果近期没有功耗数据，我们认为这个 GPU 处于不活跃状态，需要守护
             if not recent:
-                continue
+                return True  # 发现一个不活跃的GPU，立即返回True（需要守护）
+
             avg_power = sum(recent) / len(recent)
-            if avg_power >= 100:
-                return False
-        return True
+
+            # 如果平均功耗低于活跃阈值，也认为这个 GPU 处于不活跃状态，需要守护
+            if avg_power < self.active_power_threshold:  # 重点修改：从 >= 改为 <
+                return True  # 发现一个不满足活跃条件的GPU，立即返回True（需要守护）
+
+        # 如果循环结束，意味着所有 GPU 都满足了活跃条件（近期有数据且功耗 >= active_power_threshold）
+        return False  # 所有GPU都活跃，不需要守护
 
     def to_dict(self) -> dict:
         """返回当前机器的GPU信息和守护进程状态的JSON字符串"""
@@ -292,17 +298,12 @@ class Nodes:
                 node.stop_guard()
         return {node.hostname: not node.is_guard_running for node in self.nodes}
 
-    def need_guard(self, host_names: Union[List[str], None] = None) -> dict:
-        if host_names is None or len(host_names) == 0:
-            host_names = [node.hostname for node in self.nodes]
-        status = {}
+    def update_guard_policy(self, need_guard_interval, active_power_threshold):
         for node in self.nodes:
-            if node.hostname in host_names:
-                status[node.hostname] = node.need_guard()
-        return status
+            node.update_guard_policy(need_guard_interval, active_power_threshold)
 
 if __name__ == "__main__":
-    nodes = Nodes("/etc/volcano/all.host")
+    nodes = Nodes("host")
     print(nodes.to_dict())
     # Simulate starting and stopping guards
     nodes.start_guard()

@@ -27,11 +27,12 @@ class FakeGPU:
 
 
 class FakeNode:
-    def __init__(self, hostname: str, need_guard_interval=10):
+    def __init__(self, hostname: str, need_guard_interval=10, active_power_threshold=100):
         self.hostname = hostname
         self.gpus = [FakeGPU(i) for i in range(4)]  # Fake 4 GPUs on each node
         self.is_guard_running = False
         self.need_guard_interval = need_guard_interval  # Minutes
+        self.active_power_threshold = active_power_threshold
         self.last_update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.power_history = defaultdict(lambda: deque())
 
@@ -42,7 +43,17 @@ class FakeNode:
             gpu.utilization = random.uniform(0, 100)
             gpu.memory_used = random.randint(0, gpu.memory_total)
             gpu.power_draw = random.uniform(50, 250)
+            self.record_power(gpu.index, gpu.power_draw)
         self.update_time()
+
+    def record_power(self, gpu_index: int, power_draw: float):
+        now = datetime.now()
+        history = self.power_history[gpu_index]
+        history.append((now, power_draw))
+
+        cutoff = now - timedelta(minutes=30)
+        while history and history[0][0] < cutoff:
+            history.popleft()
 
     def update_guard_status(self, flag):
         """Simulate checking guard status."""
@@ -68,9 +79,25 @@ class FakeNode:
             self.is_guard_running = False
             logger.info(f"[{self.hostname}] 停止守护进程成功")
 
-    def need_guard(self):
-        """Simulate checking if the node needs a guard based on power draw."""
-        return random.choice([True, False])
+    def need_guard(self) -> bool:
+        now = datetime.now()  # 只计算一次当前时间
+
+        # 遍历所有 GPU
+        for index, records in self.power_history.items():
+            recent = [p for t, p in records if t >= now - timedelta(minutes=self.need_guard_interval)]
+
+            # 如果近期没有功耗数据，我们认为这个 GPU 处于不活跃状态，需要守护
+            if not recent:
+                return True  # 发现一个不活跃的GPU，立即返回True（需要守护）
+
+            avg_power = sum(recent) / len(recent)
+
+            # 如果平均功耗低于活跃阈值，也认为这个 GPU 处于不活跃状态，需要守护
+            if avg_power < self.active_power_threshold:  # 重点修改：从 >= 改为 <
+                return True  # 发现一个不满足活跃条件的GPU，立即返回True（需要守护）
+
+        # 如果循环结束，意味着所有 GPU 都满足了活跃条件（近期有数据且功耗 >= active_power_threshold）
+        return False  # 所有GPU都活跃，不需要守护
 
     def to_dict(self) -> dict:
         """Fake dictionary representation."""
@@ -88,9 +115,14 @@ class FakeNode:
                 'power_draw': gpu.power_draw,
             } for gpu in self.gpus],
             'guard_running': self.is_guard_running,
-            'last_updated': self.last_update_time
+            'last_updated': self.last_update_time,
+            'need_guard': self.need_guard()
         }
         return data
+
+    def update_guard_policy(self, need_guard_interval, active_power_threshold):
+        self.active_power_threshold = active_power_threshold
+        self.need_guard_interval = need_guard_interval
 
 
 class Nodes:
@@ -133,20 +165,6 @@ class Nodes:
                 node.stop_guard()
         return {node.hostname: not node.is_guard_running for node in self.nodes}
 
-    def need_guard(self, host_names: Union[List[str], None] = None) -> dict:
-        if host_names is None or len(host_names) == 0:
-            host_names = [node.hostname for node in self.nodes]
-        status = {}
+    def update_guard_policy(self, need_guard_interval, active_power_threshold):
         for node in self.nodes:
-            if node.hostname in host_names:
-                status[node.hostname] = node.need_guard()
-        return status
-
-
-# Fake testing code
-if __name__ == "__main__":
-    nodes = Nodes("/etc/volcano/all.host")  # Fake file path
-    print(nodes.to_dict())
-    # Simulate starting and stopping guards
-    nodes.start_guard()
-    nodes.stop_guard()
+            node.update_guard_policy(need_guard_interval, active_power_threshold)
