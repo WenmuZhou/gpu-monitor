@@ -7,7 +7,7 @@ import {
     NumberIncrementStepper, NumberDecrementStepper, Switch, Stack, Badge,
     AlertDialog, AlertDialogBody, AlertDialogFooter, AlertDialogHeader, AlertDialogContent, AlertDialogOverlay
 } from '@chakra-ui/react';
-import { FaServer, FaMicrochip, FaShieldAlt, FaBolt, FaTachometerAlt, FaExclamationTriangle, FaSearch, FaCogs, FaRobot, FaCog } from 'react-icons/fa';
+import { FaServer, FaMicrochip, FaShieldAlt, FaBolt, FaTachometerAlt, FaExclamationTriangle, FaSearch, FaCogs, FaRobot, FaCog, FaGlobe, FaMemory } from 'react-icons/fa';
 
 import NodeCard from './components/NodeCard';
 import EventLog from './components/EventLog'; // 引入 EventLog 组件
@@ -27,7 +27,7 @@ function SettingsModal({
     setIsAutoGuardEnabled,
     handleSavePolicy,
     isSavingPolicy,
-    addEvent
+    addEvent // IMPORTANT: Add addEvent prop here
 }) {
     return (
         <Modal isOpen={isOpen} onClose={onClose} size="lg">
@@ -50,9 +50,10 @@ function SettingsModal({
                                 id="auto-guard-switch"
                                 colorScheme="teal"
                                 isChecked={isAutoGuardEnabled}
-                                onChange={(e) => {
+                                onChange={(e) => { // Capture event to get checked status
                                     const isChecked = e.target.checked;
                                     setIsAutoGuardEnabled(isChecked);
+                                    // Log for auto-guard switch toggle
                                     addEvent(`设置：自动守护功能已${isChecked ? '开启' : '关闭'}。`, 'info');
                                 }}
                             />
@@ -68,6 +69,7 @@ function SettingsModal({
                                     onChange={(valueString) => {
                                         const newInterval = parseInt(valueString);
                                         setGuardIntervalMinutes(newInterval);
+                                        // Log for guard interval change
                                         addEvent(`设置：不活跃判断间隔已设置为 ${newInterval} 分钟。`, 'info');
                                     }}
                                     min={1}
@@ -90,6 +92,7 @@ function SettingsModal({
                                     onChange={(valueString) => {
                                         const newThreshold = parseInt(valueString);
                                         setActivePowerThreshold(newThreshold);
+                                        // Log for power threshold change
                                         addEvent(`设置：活跃功耗阈值已设置为 ${newThreshold} W。`, 'info');
                                     }}
                                     min={1}
@@ -123,6 +126,7 @@ function SettingsModal({
                                 onChange={(e) => {
                                     const newInterval = Number(e.target.value);
                                     setRefreshInterval(newInterval);
+                                    // Log for refresh interval change
                                     addEvent(`设置：数据刷新间隔已设置为 ${newInterval / 1000} 秒。`, 'info');
                                 }}
                                 width="full"
@@ -161,11 +165,11 @@ function App() {
 
     // 用于添加日志的辅助函数
     const addEvent = useCallback((message, type = 'info') => {
-        const timestamp = new Date().toLocaleTimeString();
+        const timestamp = new Date().toLocaleTimeString(); // Use toLocaleTimeString for better formatting
         setEvents(prevEvents => [
-            { id: Date.now() + Math.random(), timestamp, message, type },
+            { id: Date.now() + Math.random(), timestamp, message, type }, // Use unique ID
             ...prevEvents
-        ].slice(0, 50));
+        ].slice(0, 50)); // 只保留最新的50条
     }, []);
 
     // 清空事件日志的函数
@@ -199,26 +203,39 @@ function App() {
     const cancelStopRef = React.useRef();
 
 
-    // 计算总览数据 (保持不变)
+    // 计算总览数据
     const totalNodes = nodes.length;
+    // Removed onlineNodes and offlineNodes calculations and display
+    // const onlineNodes = nodes.filter(node => node.is_online).length;
+    // const offlineNodes = totalNodes - onlineNodes;
+
     const guardedNodes = nodes.filter(node => node.guard_running).length;
     const needGuardNodes = nodes.filter(node => node.need_guard).length;
     let totalGpus = 0;
-    let totalGpuPowerDraw = 0;
+    let totalGpuPowerDraw = 0; // This will become sum for average calculation
     let totalGpuUtilization = 0;
     let activeGpusCount = 0;
+    // Removed totalGpuMemoryUsed and totalGpuMemoryTotal calculations
+    // let totalGpuMemoryUsed = 0;
+    // let totalGpuMemoryTotal = 0;
 
     nodes.forEach(node => {
         totalGpus += node.gpus.length;
         node.gpus.forEach(gpu => {
-            totalGpuPowerDraw += gpu.power_draw;
-            if (gpu.utilization > 0) {
+            totalGpuPowerDraw += gpu.power_draw; // Still sum up for average
+            // totalGpuMemoryUsed += gpu.memory_used; // Removed
+            // totalGpuMemoryTotal += gpu.memory_total; // Removed
+            if (gpu.utilization > 0) { // Consider GPUs with >0 utilization as active for average calculation
                 totalGpuUtilization += gpu.utilization;
                 activeGpusCount++;
             }
         });
     });
     const averageGpuUtilization = activeGpusCount > 0 ? (totalGpuUtilization / activeGpusCount) : 0;
+    // Calculate average power draw for all GPUs
+    const averageTotalGpuPowerDraw = totalGpus > 0 ? (totalGpuPowerDraw / totalGpus) : 0;
+    // Removed averageGpuMemoryUtilization calculation
+    // const averageGpuMemoryUtilization = totalGpuMemoryTotal > 0 ? (totalGpuMemoryUsed / totalGpuMemoryTotal * 100) : 0;
 
 
     // loadNodes 函数，负责获取数据和执行自动守护逻辑
@@ -524,29 +541,35 @@ function App() {
                 </Button>
             </Flex>
 
-            {/* 总览信息 */}
-            <SimpleGrid columns={{ base: 1, md: 3, lg: 5 }} spacing={4} mb={8}>
+            {/* 总览信息 - 优化布局与内容 */}
+            <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 6 }} spacing={6} mb={8}> {/* Adjusted columns to try and fit all in one row on large screens */}
+
+                {/* 节点状态概览 */}
                 <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="blue.50">
                     <StatLabel display="flex" alignItems="center"><Icon as={FaServer} mr={2} />总节点数</StatLabel>
                     <StatNumber fontSize="2xl">{totalNodes}</StatNumber>
                 </Stat>
-                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="green.50">
+
+                {/* 守护状态概览 */}
+                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="teal.50"> {/* 可以给守护相关一个颜色 */}
                     <StatLabel display="flex" alignItems="center"><Icon as={FaShieldAlt} mr={2} />守护中</StatLabel>
                     <StatNumber fontSize="2xl">{guardedNodes} / {totalNodes}</StatNumber>
                 </Stat>
-                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="red.50">
+                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="orange.50"> {/* 需要守护用警告色 */}
                     <StatLabel display="flex" alignItems="center"><Icon as={FaExclamationTriangle} mr={2} />需要守护</StatLabel>
                     <StatNumber fontSize="2xl">{needGuardNodes} / {totalNodes}</StatNumber>
                 </Stat>
+
+                {/* 资源使用概览 */}
                 <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="purple.50">
                     <StatLabel display="flex" alignItems="center"><Icon as={FaMicrochip} mr={2} />总GPU数</StatLabel>
                     <StatNumber fontSize="2xl">{totalGpus}</StatNumber>
                 </Stat>
                 <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="orange.50">
-                    <StatLabel display="flex" alignItems="center"><Icon as={FaBolt} mr={2} />总GPU功耗 (W)</StatLabel>
-                    <StatNumber fontSize="2xl">{totalGpuPowerDraw.toFixed(2)} W</StatNumber>
+                    <StatLabel display="flex" alignItems="center"><Icon as={FaBolt} mr={2} />平均功耗 (W)</StatLabel> {/* Changed label to Average Power Draw */}
+                    <StatNumber fontSize="2xl">{averageTotalGpuPowerDraw.toFixed(2)} W</StatNumber> {/* Display average */}
                 </Stat>
-                 <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="teal.50">
+                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="teal.50">
                     <StatLabel display="flex" alignItems="center"><Icon as={FaTachometerAlt} mr={2} />平均GPU利用率 (%)</StatLabel>
                     <StatNumber fontSize="2xl">{averageGpuUtilization.toFixed(2)} %</StatNumber>
                 </Stat>
