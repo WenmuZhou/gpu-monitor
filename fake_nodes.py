@@ -145,7 +145,7 @@ class Nodes:
 
 # Fake testing code
 if __name__ == "__main__":
-    nodes = Nodes("/etc/volcano/all.host")  # Fake file path
+    nodes = Nodes("host")  # Fake file path
     print(nodes.to_dict())
     # Simulate starting and stopping guards
     nodes.start_guard()

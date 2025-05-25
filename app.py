@@ -3,7 +3,7 @@ from fake_nodes import Nodes  # 引入 nodes.py 中的 Nodes 类
 from loguru import logger
 
 app = Flask(__name__)
-nodes_manager = Nodes("/etc/volcano/all.host")
+nodes_manager = Nodes("host")
 
 
 @app.route('/')

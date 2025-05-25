@@ -302,7 +302,7 @@ class Nodes:
         return status
 
 if __name__ == "__main__":
-    nodes = Nodes("/etc/volcano/all.host")
+    nodes = Nodes("host")
     print(nodes.to_dict())
     # Simulate starting and stopping guards
     nodes.start_guard()
