@@ -4,7 +4,8 @@ import {
     Stat, StatLabel, StatNumber, SimpleGrid, Icon, Select, Input, InputGroup, InputLeftElement,
     Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton,
     useDisclosure, FormControl, FormLabel, NumberInput, NumberInputField, NumberInputStepper,
-    NumberIncrementStepper, NumberDecrementStepper, Switch, Stack, Badge
+    NumberIncrementStepper, NumberDecrementStepper, Switch, Stack, Badge,
+    AlertDialog, AlertDialogBody, AlertDialogFooter, AlertDialogHeader, AlertDialogContent, AlertDialogOverlay
 } from '@chakra-ui/react';
 import { FaServer, FaMicrochip, FaShieldAlt, FaBolt, FaTachometerAlt, FaExclamationTriangle, FaSearch, FaCogs, FaRobot, FaCog } from 'react-icons/fa';
 
@@ -12,7 +13,7 @@ import NodeCard from './components/NodeCard';
 import EventLog from './components/EventLog'; // 引入 EventLog 组件
 import { fetchNodes, startGuard, stopGuard, updateGuardPolicy } from './services/api';
 
-// 定义 SettingsModal 组件 (保持不变)
+// 定义 SettingsModal 组件
 function SettingsModal({
     isOpen,
     onClose,
@@ -25,7 +26,8 @@ function SettingsModal({
     isAutoGuardEnabled,
     setIsAutoGuardEnabled,
     handleSavePolicy,
-    isSavingPolicy
+    isSavingPolicy,
+    addEvent
 }) {
     return (
         <Modal isOpen={isOpen} onClose={onClose} size="lg">
@@ -48,7 +50,11 @@ function SettingsModal({
                                 id="auto-guard-switch"
                                 colorScheme="teal"
                                 isChecked={isAutoGuardEnabled}
-                                onChange={() => setIsAutoGuardEnabled(prev => !prev)}
+                                onChange={(e) => {
+                                    const isChecked = e.target.checked;
+                                    setIsAutoGuardEnabled(isChecked);
+                                    addEvent(`设置：自动守护功能已${isChecked ? '开启' : '关闭'}。`, 'info');
+                                }}
                             />
                         </FormControl>
 
@@ -59,7 +65,11 @@ function SettingsModal({
                                 <FormLabel>不活跃判断间隔 (分钟)</FormLabel>
                                 <NumberInput
                                     value={guardIntervalMinutes}
-                                    onChange={(valueString) => setGuardIntervalMinutes(parseInt(valueString))}
+                                    onChange={(valueString) => {
+                                        const newInterval = parseInt(valueString);
+                                        setGuardIntervalMinutes(newInterval);
+                                        addEvent(`设置：不活跃判断间隔已设置为 ${newInterval} 分钟。`, 'info');
+                                    }}
                                     min={1}
                                     max={60}
                                 >
@@ -77,7 +87,11 @@ function SettingsModal({
                                 <FormLabel>活跃功耗阈值 (W)</FormLabel>
                                 <NumberInput
                                     value={activePowerThreshold}
-                                    onChange={(valueString) => setActivePowerThreshold(parseInt(valueString))}
+                                    onChange={(valueString) => {
+                                        const newThreshold = parseInt(valueString);
+                                        setActivePowerThreshold(newThreshold);
+                                        addEvent(`设置：活跃功耗阈值已设置为 ${newThreshold} W。`, 'info');
+                                    }}
                                     min={1}
                                     max={500}
                                 >
@@ -90,7 +104,6 @@ function SettingsModal({
                                 <Text fontSize="sm" color="gray.500">
                                     当GPU平均功耗低于此值时，视为不活跃。
                                 </Text>
-                            {/* 之前这里有一个 Button, 现在移到 Box 外部与 FormControls 并列 */}
                             </FormControl>
                             <Button
                                 colorScheme="blue"
@@ -107,7 +120,11 @@ function SettingsModal({
                             <FormLabel><Icon as={FaTachometerAlt} mr={2} />数据刷新间隔</FormLabel>
                             <Select
                                 value={refreshInterval}
-                                onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                                onChange={(e) => {
+                                    const newInterval = Number(e.target.value);
+                                    setRefreshInterval(newInterval);
+                                    addEvent(`设置：数据刷新间隔已设置为 ${newInterval / 1000} 秒。`, 'info');
+                                }}
                                 width="full"
                             >
                                 <option value={1000}>1 秒</option>
@@ -144,9 +161,18 @@ function App() {
 
     // 用于添加日志的辅助函数
     const addEvent = useCallback((message, type = 'info') => {
-        const timestamp = new Date().toLocaleString();
-        setEvents(prevEvents => [{ timestamp, message, type }, ...prevEvents].slice(0, 50)); // 只保留最新的50条
+        const timestamp = new Date().toLocaleTimeString();
+        setEvents(prevEvents => [
+            { id: Date.now() + Math.random(), timestamp, message, type },
+            ...prevEvents
+        ].slice(0, 50));
     }, []);
+
+    // 清空事件日志的函数
+    const onClearEvents = useCallback(() => {
+        setEvents([]);
+        addEvent("事件日志已清空。", "info");
+    }, [addEvent]);
 
 
     // States for sorting and filtering
@@ -163,6 +189,14 @@ function App() {
 
     // Modal disclosure for SettingsModal
     const { isOpen: isSettingsModalOpen, onOpen: onSettingsModalOpen, onClose: onSettingsModalClose } = useDisclosure();
+
+    // Disclosure for "Start All Guards" confirmation dialog
+    const { isOpen: isStartConfirmOpen, onOpen: onStartConfirmOpen, onClose: onStartConfirmClose } = useDisclosure();
+    const cancelRef = React.useRef();
+
+    // Disclosure for "Stop All Guards" confirmation dialog
+    const { isOpen: isStopConfirmOpen, onOpen: onStopConfirmOpen, onClose: onStopConfirmClose } = useDisclosure();
+    const cancelStopRef = React.useRef();
 
 
     // 计算总览数据 (保持不变)
@@ -191,6 +225,7 @@ function App() {
     const loadNodes = useCallback(async () => {
         if (initialLoading) {
             setInitialLoading(true);
+            addEvent("开始加载节点数据...", "info"); // Log initial loading start
         } else {
             setIsUpdating(true);
         }
@@ -248,7 +283,7 @@ function App() {
             setInitialLoading(false);
             setIsUpdating(false);
         }
-    }, [initialLoading, toast, isAutoGuardEnabled, addEvent]); // 依赖中加入 addEvent
+    }, [initialLoading, toast, isAutoGuardEnabled, addEvent]);
 
 
     // useEffect for initial load and periodic refresh
@@ -260,13 +295,14 @@ function App() {
     }, [loadNodes, refreshInterval]);
 
 
-    // 处理“启动所有守护”按钮点击事件
+    // 处理“启动所有守护”按钮点击事件 (现在通过确认弹窗触发)
     const handleStartAllGuards = useCallback(async () => {
+        onStartConfirmClose(); // Close the confirmation dialog
         setIsUpdating(true);
         try {
             const allHostnames = nodes.map(node => node.hostname);
             await startGuard(allHostnames);
-            const message = "所有守护进程已启动。";
+            const message = "手动操作：所有守护进程已启动。";
             toast({
                 title: "操作成功",
                 description: message,
@@ -274,7 +310,7 @@ function App() {
                 duration: 3000,
                 isClosable: true,
             });
-            addEvent(message, "success"); // 添加日志
+            addEvent(message, "success"); // 添加日志: "开启守护"
             loadNodes();
         } catch (error) {
             const errorMessage = `启动所有守护失败: ${error.message}`;
@@ -289,15 +325,16 @@ function App() {
         } finally {
             setIsUpdating(false);
         }
-    }, [nodes, toast, loadNodes, addEvent]);
+    }, [nodes, toast, loadNodes, addEvent, onStartConfirmClose]);
 
-    // 处理“停止所有守护”按钮点击事件
+    // 处理“停止所有守护”按钮点击事件 (现在通过确认弹窗触发)
     const handleStopAllGuards = useCallback(async () => {
+        onStopConfirmClose(); // Close the confirmation dialog
         setIsUpdating(true);
         try {
             const allHostnames = nodes.map(node => node.hostname);
             await stopGuard(allHostnames);
-            const message = "所有守护进程已停止。";
+            const message = "手动操作：所有守护进程已停止。";
             toast({
                 title: "操作成功",
                 description: message,
@@ -305,7 +342,7 @@ function App() {
                 duration: 3000,
                 isClosable: true,
             });
-            addEvent(message, "info"); // 添加日志
+            addEvent(message, "warning"); // 添加日志: "关闭守护", 使用 'warning' 类型
             loadNodes();
         } catch (error) {
             const errorMessage = `停止所有守护失败: ${error.message}`;
@@ -320,7 +357,7 @@ function App() {
         } finally {
             setIsUpdating(false);
         }
-    }, [nodes, toast, loadNodes, addEvent]);
+    }, [nodes, toast, loadNodes, addEvent, onStopConfirmClose]);
 
 
     // 处理守护策略保存 (现在从 SettingsModal 调用)
@@ -328,6 +365,7 @@ function App() {
         setIsSavingPolicy(true);
         try {
             const policy = {
+                enabled: isAutoGuardEnabled, // Ensure 'enabled' is passed to backend
                 active_power_threshold: activePowerThreshold,
                 guard_interval_minutes: guardIntervalMinutes,
             };
@@ -341,9 +379,15 @@ function App() {
                 isClosable: true,
             });
             addEvent(message, "success"); // 添加日志
+
+            // Log for auto-guard policy save (enabled/disabled)
             if (isAutoGuardEnabled) {
+                addEvent("自动守护策略已启用。", "info");
                 loadNodes(); // 策略保存后，如果自动守护开启，重新加载节点数据以立即生效
+            } else {
+                addEvent("自动守护策略已禁用。", "warning"); // 添加日志: "保存自动守护策略" - 禁用
             }
+            onSettingsModalClose(); // Close modal on successful save
         } catch (error) {
             const errorMessage = `策略保存失败: ${error.message}`;
             toast({
@@ -357,7 +401,7 @@ function App() {
         } finally {
             setIsSavingPolicy(false);
         }
-    }, [activePowerThreshold, guardIntervalMinutes, toast, isAutoGuardEnabled, loadNodes, addEvent]);
+    }, [activePowerThreshold, guardIntervalMinutes, toast, isAutoGuardEnabled, loadNodes, addEvent, onSettingsModalClose]);
 
 
     // Memoized filtered and sorted nodes (保持不变)
@@ -439,7 +483,7 @@ function App() {
                     bg="green.500"
                     _hover={{ bg: "green.600" }}
                     minW="120px"
-                    onClick={handleStartAllGuards}
+                    onClick={onStartConfirmOpen} // Changed to open confirmation dialog
                     isLoading={isUpdating && nodes.some(node => node.need_guard && !node.guard_running)}
                     isDisabled={nodes.every(node => node.guard_running) || nodes.length === 0}
                     loadingText="启动中..."
@@ -453,7 +497,7 @@ function App() {
                     bg="red.500"
                     _hover={{ bg: "red.600" }}
                     minW="120px"
-                    onClick={handleStopAllGuards}
+                    onClick={onStopConfirmOpen} // Changed to open confirmation dialog
                     isLoading={isUpdating && nodes.some(node => node.guard_running)}
                     isDisabled={nodes.every(node => !node.guard_running) || nodes.length === 0}
                     loadingText="停止中..."
@@ -511,7 +555,10 @@ function App() {
             {/* 排序和筛选控制 */}
             <Flex mb={6} align="center">
                 <Text mr={3} fontWeight="bold">排序方式:</Text>
-                <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} width="200px" mr={6}>
+                <Select value={sortBy} onChange={(e) => {
+                    setSortBy(e.target.value);
+                    addEvent(`排序：排序方式已更改为 "${e.target.options[e.target.selectedIndex].text}"。`, 'info'); // Log sort change
+                }} width="200px" mr={6}>
                     <option value="hostname">主机名</option>
                     <option value="totalGpus">总GPU数量</option>
                     <option value="guardedNodes">守护状态</option>
@@ -519,7 +566,10 @@ function App() {
                 </Select>
 
                 <Text mr={3} fontWeight="bold">筛选状态:</Text>
-                <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} width="150px" mr={6}>
+                <Select value={filterStatus} onChange={(e) => {
+                    setFilterStatus(e.target.value);
+                    addEvent(`筛选：状态筛选已更改为 "${e.target.options[e.target.selectedIndex].text}"。`, 'info'); // Log filter change
+                }} width="150px" mr={6}>
                     <option value="all">所有节点</option>
                     <option value="guarding">守护中</option>
                     <option value="not_guarding">未守护</option>
@@ -535,14 +585,22 @@ function App() {
                     <Input
                         placeholder="输入主机名搜索..."
                         value={filterText}
-                        onChange={(e) => setFilterText(e.target.value)}
+                        onChange={(e) => {
+                            setFilterText(e.target.value);
+                            // Log search text change
+                            if (e.target.value) {
+                                addEvent(`筛选：搜索文本已更改为 "${e.target.value}"。`, 'info');
+                            } else {
+                                addEvent("筛选：搜索文本已清空。", "info");
+                            }
+                        }}
                     />
                 </InputGroup>
                 <Spacer />
             </Flex>
 
             {/* 事件日志组件 */}
-            <EventLog events={events} onClearEvents={() => setEvents([])} />
+            <EventLog events={events} onClearEvents={onClearEvents} />
 
             {/* 节点列表 */}
             <SimpleGrid columns={1} spacing={6}>
@@ -565,7 +623,64 @@ function App() {
                 setIsAutoGuardEnabled={setIsAutoGuardEnabled}
                 handleSavePolicy={handleSavePolicy}
                 isSavingPolicy={isSavingPolicy}
+                addEvent={addEvent}
             />
+
+            {/* Start All Guards Confirmation Dialog */}
+            <AlertDialog
+                isOpen={isStartConfirmOpen}
+                leastDestructiveRef={cancelRef}
+                onClose={onStartConfirmClose}
+            >
+                <AlertDialogOverlay>
+                    <AlertDialogContent>
+                        <AlertDialogHeader fontSize="lg" fontWeight="bold">
+                            确认启动所有守护进程
+                        </AlertDialogHeader>
+
+                        <AlertDialogBody>
+                            您确定要为所有检测到的节点启动守护进程吗？此操作会使所有符合条件的 GPU 处于守护状态。
+                        </AlertDialogBody>
+
+                        <AlertDialogFooter>
+                            <Button ref={cancelRef} onClick={onStartConfirmClose}>
+                                取消
+                            </Button>
+                            <Button colorScheme="green" onClick={handleStartAllGuards} ml={3}>
+                                启动
+                            </Button>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialogOverlay>
+            </AlertDialog>
+
+            {/* Stop All Guards Confirmation Dialog */}
+            <AlertDialog
+                isOpen={isStopConfirmOpen}
+                leastDestructiveRef={cancelStopRef}
+                onClose={onStopConfirmClose}
+            >
+                <AlertDialogOverlay>
+                    <AlertDialogContent>
+                        <AlertDialogHeader fontSize="lg" fontWeight="bold">
+                            确认停止所有守护进程
+                        </AlertDialogHeader>
+
+                        <AlertDialogBody>
+                            您确定要停止所有正在运行的守护进程吗？此操作将停止所有节点的 GPU 守护。
+                        </AlertDialogBody>
+
+                        <AlertDialogFooter>
+                            <Button ref={cancelStopRef} onClick={onStopConfirmClose}>
+                                取消
+                            </Button>
+                            <Button colorScheme="red" onClick={handleStopAllGuards} ml={3}>
+                                停止
+                            </Button>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialogOverlay>
+            </AlertDialog>
         </Container>
     );
 }

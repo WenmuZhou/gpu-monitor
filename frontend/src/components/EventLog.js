@@ -25,17 +25,27 @@ function EventLog({ events, onClearEvents }) {
                             <Text color="gray.500" fontStyle="italic" mt={2}>暂无事件记录。</Text>
                         ) : (
                             <VStack align="stretch" spacing={2} mt={3} maxHeight="300px" overflowY="auto">
-                                {events.map((event, index) => (
+                                {events.map((event) => ( // Removed 'index' from map, using event.id
                                     <Box
-                                        key={index} // 实际应用中应该使用更稳定的ID，这里用index简化
+                                        key={event.id} // IMPORTANT: Use event.id for unique keys
                                         p={2}
-                                        bg={event.type === 'error' ? 'red.50' : (event.type === 'info' ? 'blue.50' : 'gray.100')}
+                                        bg={
+                                            event.type === 'error' ? 'red.50' :
+                                            event.type === 'success' ? 'green.50' :
+                                            event.type === 'warning' ? 'orange.50' :
+                                            'blue.50' // Default for 'info' or unmatched types
+                                        }
                                         borderRadius="md"
                                         borderLeft="4px solid"
-                                        borderColor={event.type === 'error' ? 'red.400' : (event.type === 'info' ? 'blue.400' : 'gray.300')}
+                                        borderColor={
+                                            event.type === 'error' ? 'red.400' :
+                                            event.type === 'success' ? 'green.400' :
+                                            event.type === 'warning' ? 'orange.400' :
+                                            'blue.400' // Default for 'info' or unmatched types
+                                        }
                                         fontSize="sm"
                                     >
-                                        <Text fontWeight="bold" color="gray.700">{event.timestamp}</Text>
+                                        <Text fontWeight="bold" color="gray.700">[{event.timestamp}]</Text> {/* Added square brackets for timestamp */}
                                         <Text color="gray.800">{event.message}</Text>
                                     </Box>
                                 ))}
