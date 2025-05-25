@@ -589,7 +589,6 @@ function App() {
                 <Text mr={3} fontWeight="bold">排序方式:</Text>
                 <Select value={sortBy} onChange={(e) => {
                     setSortBy(e.target.value);
-                    addEvent(`排序：排序方式已更改为 "${e.target.options[e.target.selectedIndex].text}"。`, 'info'); // Log sort change
                 }} width="200px" mr={6} title="选择节点列表的排序方式">
                     <option value="hostname">主机名</option>
                     <option value="totalGpus">总GPU数量</option>
@@ -600,7 +599,6 @@ function App() {
                 <Text mr={3} fontWeight="bold">筛选状态:</Text>
                 <Select value={filterStatus} onChange={(e) => {
                     setFilterStatus(e.target.value);
-                    addEvent(`筛选：状态筛选已更改为 "${e.target.options[e.target.selectedIndex].text}"。`, 'info'); // Log filter change
                 }} width="150px" mr={6} title="根据节点守护状态筛选列表">
                     <option value="all">所有节点</option>
                     <option value="guarding">守护中</option>
@@ -619,12 +617,6 @@ function App() {
                         value={filterText}
                         onChange={(e) => {
                             setFilterText(e.target.value);
-                            // Log search text change
-                            if (e.target.value) {
-                                addEvent(`筛选：搜索文本已更改为 "${e.target.value}"。`, 'info');
-                            } else {
-                                addEvent("筛选：搜索文本已清空。", "info");
-                            }
                         }}
                         title="输入主机名以搜索特定节点"
                     />
