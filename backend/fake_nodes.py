@@ -29,7 +29,7 @@ class FakeGPU:
 class FakeNode:
     def __init__(self, hostname: str, need_guard_interval=10, active_power_threshold=100):
         self.hostname = hostname
-        self.gpus = [FakeGPU(i) for i in range(4)]  # Fake 4 GPUs on each node
+        self.gpus = [FakeGPU(i) for i in range(8)]  # Fake 4 GPUs on each node
         self.is_guard_running = False
         self.need_guard_interval = need_guard_interval  # Minutes
         self.active_power_threshold = active_power_threshold

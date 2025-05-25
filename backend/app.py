@@ -47,13 +47,31 @@ def api_stop_guard():
 
 @app.route('/api/guard_policy', methods=['POST'])
 def api_updagte_guard_policy():
-    """API 端点：在指定节点（或所有节点）上停止守护进程。"""
-    data = request.get_json()
-    data = data.get('policy', {})
-    data['need_guard_interval'] = data.pop('guard_interval_minutes')
-    nodes_manager.update_guard_policy(**data)
-    logger.info(f"在全部节点更新守护进程策略: {data}")
-    return jsonify({"status": "success"})
+    """API 端点：更新守护策略。"""
+    received_data = request.get_json()
+    # 从接收到的数据中提取 'policy' 字典
+    policy_data = received_data.get('policy', {})
+
+    active_power_threshold = policy_data.get('active_power_threshold')
+    guard_interval_minutes = policy_data.get('guard_interval_minutes')
+
+    if active_power_threshold is None or guard_interval_minutes is None:
+        return jsonify({"error": "Missing 'active_power_threshold' or 'guard_interval_minutes' in policy data"}), 400
+
+    try:
+        # 调用 nodes_manager.update_guard_policy
+        # 确保参数名称和顺序与 FakeNode.update_guard_policy(self, need_guard_interval, active_power_threshold) 匹配
+        nodes_manager.update_guard_policy(
+            need_guard_interval=int(guard_interval_minutes), # 对应 FakeNode 的 need_guard_interval
+            active_power_threshold=int(active_power_threshold) # 对应 FakeNode 的 active_power_threshold
+        )
+        logger.info(f"在全部节点更新守护进程策略: Active Power Threshold={active_power_threshold}, Guard Interval Minutes={guard_interval_minutes}")
+        return jsonify({"status": "success", "message": "Guard policy updated successfully"})
+    except ValueError:
+        return jsonify({"error": "Invalid value for threshold or interval. Must be integers."}), 400
+    except Exception as e:
+        logger.error(f"更新守护策略失败: {e}")
+        return jsonify({"error": f"Failed to update guard policy: {str(e)}"}), 500
 
 
 if __name__ == '__main__':

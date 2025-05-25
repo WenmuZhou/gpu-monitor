@@ -40,6 +40,7 @@ export const updateGuardPolicy = async (policy) => {
     // In a real application, you would send this policy to your backend.
     // Example:
     try {
+        // 前端通过 axios 发送的请求体是 { policy: { active_power_threshold: X, guard_interval_minutes: Y } }
         const response = await axios.post(`${API_BASE_URL}/guard_policy`, { policy });
         return response.data;
     } catch (error) {
@@ -47,3 +48,4 @@ export const updateGuardPolicy = async (policy) => {
         throw error;
     }
 };
+
