@@ -9,7 +9,7 @@ from loguru import logger
 class FakeGPU:
     def __init__(self, index: int):
         self.index = index
-        self.name = f"Fake GPU {index}"
+        self.name = f"NVIDIA Tesla V100-SXM2-32GB"
         self.temperature = random.uniform(30, 80)  # Simulate temperature between 30°C to 80°C
         self.utilization = random.uniform(0, 100)  # Simulate utilization between 0% to 100%
         self.memory_used = random.randint(0, 16000)  # Simulate used memory (in MiB)
