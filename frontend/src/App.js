@@ -37,7 +37,7 @@ function SettingsModal({
                     <Icon as={FaCog} mr={3} />
                     应用设置
                 </ModalHeader>
-                <ModalCloseButton />
+                <ModalCloseButton title="关闭设置窗口" />
                 <ModalBody>
                     <Stack spacing={6}>
                         {/* 自动守护开关 */}
@@ -56,6 +56,7 @@ function SettingsModal({
                                     // Log for auto-guard switch toggle
                                     addEvent(`设置：自动守护功能已${isChecked ? '开启' : '关闭'}。`, 'info');
                                 }}
+                                title="切换自动守护功能的开启/关闭"
                             />
                         </FormControl>
 
@@ -74,6 +75,7 @@ function SettingsModal({
                                     }}
                                     min={1}
                                     max={60}
+                                    title="设置判断GPU不活跃的时间间隔"
                                 >
                                     <NumberInputField />
                                     <NumberInputStepper>
@@ -86,7 +88,7 @@ function SettingsModal({
                                 </Text>
                             </FormControl>
                             <FormControl id="power-threshold" mb={4}>
-                                <FormLabel>活跃功耗阈值 (W)</FormLabel>
+                                <FormLabel>活跃功耗阈值 (W)</FormLabel> {/* Corrected closing tag from </Label> to </FormLabel> */}
                                 <NumberInput
                                     value={activePowerThreshold}
                                     onChange={(valueString) => {
@@ -97,6 +99,7 @@ function SettingsModal({
                                     }}
                                     min={1}
                                     max={500}
+                                    title="设置判断GPU活跃的功耗阈值"
                                 >
                                     <NumberInputField />
                                     <NumberInputStepper>
@@ -113,6 +116,7 @@ function SettingsModal({
                                 onClick={handleSavePolicy}
                                 isLoading={isSavingPolicy}
                                 size="sm"
+                                title="保存当前的守护策略设置"
                             >
                                 保存守护策略
                             </Button>
@@ -130,6 +134,7 @@ function SettingsModal({
                                     addEvent(`设置：数据刷新间隔已设置为 ${newInterval / 1000} 秒。`, 'info');
                                 }}
                                 width="full"
+                                title="设置页面自动刷新数据的时间间隔"
                             >
                                 <option value={1000}>1 秒</option>
                                 <option value={3000}>3 秒</option>
@@ -145,7 +150,7 @@ function SettingsModal({
                     </Stack>
                 </ModalBody>
                 <ModalFooter>
-                    <Button variant="ghost" onClick={onClose}>关闭</Button>
+                    <Button variant="ghost" onClick={onClose} title="关闭设置窗口">关闭</Button>
                 </ModalFooter>
             </ModalContent>
         </Modal>
@@ -466,7 +471,7 @@ function App() {
         return (
             <Container centerContent py={10} bg="white" minHeight="100vh">
                 <Text color="red.500" fontSize="lg">{error}</Text>
-                <Button mt={4} onClick={loadNodes} colorScheme="teal">重试</Button>
+                <Button mt={4} onClick={loadNodes} colorScheme="teal" title="重新加载节点数据">重试</Button>
             </Container>
         );
     }
@@ -489,6 +494,7 @@ function App() {
                         display="flex"
                         alignItems="center"
                         mr={4}
+                        title={isAutoGuardEnabled ? "自动守护功能当前已开启，系统将自动管理不活跃GPU" : "自动守护功能当前已关闭，需要手动管理GPU"}
                     >
                         <Icon as={FaRobot} mr={2} /> 自动守护已启用
                     </Badge>
@@ -500,11 +506,12 @@ function App() {
                     bg="green.500"
                     _hover={{ bg: "green.600" }}
                     minW="120px"
-                    onClick={onStartConfirmOpen} // Changed to open confirmation dialog
+                    onClick={onStartConfirmOpen}
                     isLoading={isUpdating && nodes.some(node => node.need_guard && !node.guard_running)}
                     isDisabled={nodes.every(node => node.guard_running) || nodes.length === 0}
                     loadingText="启动中..."
                     ml={2}
+                    title="手动启动所有节点的GPU守护进程"
                 >
                     启动所有守护
                 </Button>
@@ -514,11 +521,12 @@ function App() {
                     bg="red.500"
                     _hover={{ bg: "red.600" }}
                     minW="120px"
-                    onClick={onStopConfirmOpen} // Changed to open confirmation dialog
+                    onClick={onStopConfirmOpen}
                     isLoading={isUpdating && nodes.some(node => node.guard_running)}
                     isDisabled={nodes.every(node => !node.guard_running) || nodes.length === 0}
                     loadingText="停止中..."
                     ml={4}
+                    title="手动停止所有节点的GPU守护进程"
                 >
                     停止所有守护
                 </Button>
@@ -536,40 +544,41 @@ function App() {
                     variant="solid"
                     onClick={onSettingsModalOpen}
                     ml={4}
+                    title="打开应用设置"
                 >
                     设置
                 </Button>
             </Flex>
 
             {/* 总览信息 - 优化布局与内容 */}
-            <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 6 }} spacing={6} mb={8}> {/* Adjusted columns to try and fit all in one row on large screens */}
+            <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 6 }} spacing={6} mb={8}>
 
                 {/* 节点状态概览 */}
-                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="blue.50">
+                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="blue.50" title="当前集群中的总节点数量">
                     <StatLabel display="flex" alignItems="center"><Icon as={FaServer} mr={2} />总节点数</StatLabel>
                     <StatNumber fontSize="2xl">{totalNodes}</StatNumber>
                 </Stat>
 
                 {/* 守护状态概览 */}
-                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="teal.50"> {/* 可以给守护相关一个颜色 */}
+                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="teal.50" title="当前正在运行守护进程的节点数量">
                     <StatLabel display="flex" alignItems="center"><Icon as={FaShieldAlt} mr={2} />守护中</StatLabel>
                     <StatNumber fontSize="2xl">{guardedNodes} / {totalNodes}</StatNumber>
                 </Stat>
-                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="orange.50"> {/* 需要守护用警告色 */}
+                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="orange.50" title="当前检测到需要启动守护进程的节点数量">
                     <StatLabel display="flex" alignItems="center"><Icon as={FaExclamationTriangle} mr={2} />需要守护</StatLabel>
                     <StatNumber fontSize="2xl">{needGuardNodes} / {totalNodes}</StatNumber>
                 </Stat>
 
                 {/* 资源使用概览 */}
-                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="purple.50">
+                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="purple.50" title="当前集群中所有GPU的总数量">
                     <StatLabel display="flex" alignItems="center"><Icon as={FaMicrochip} mr={2} />总GPU数</StatLabel>
                     <StatNumber fontSize="2xl">{totalGpus}</StatNumber>
                 </Stat>
-                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="orange.50">
-                    <StatLabel display="flex" alignItems="center"><Icon as={FaBolt} mr={2} />平均功耗 (W)</StatLabel> {/* Changed label to Average Power Draw */}
-                    <StatNumber fontSize="2xl">{averageTotalGpuPowerDraw.toFixed(2)} W</StatNumber> {/* Display average */}
+                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="orange.50" title="所有GPU的平均功耗">
+                    <StatLabel display="flex" alignItems="center"><Icon as={FaBolt} mr={2} />平均功耗 (W)</StatLabel>
+                    <StatNumber fontSize="2xl">{averageTotalGpuPowerDraw.toFixed(2)} W</StatNumber>
                 </Stat>
-                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="teal.50">
+                <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="teal.50" title="所有GPU的平均利用率">
                     <StatLabel display="flex" alignItems="center"><Icon as={FaTachometerAlt} mr={2} />平均GPU利用率 (%)</StatLabel>
                     <StatNumber fontSize="2xl">{averageGpuUtilization.toFixed(2)} %</StatNumber>
                 </Stat>
@@ -581,7 +590,7 @@ function App() {
                 <Select value={sortBy} onChange={(e) => {
                     setSortBy(e.target.value);
                     addEvent(`排序：排序方式已更改为 "${e.target.options[e.target.selectedIndex].text}"。`, 'info'); // Log sort change
-                }} width="200px" mr={6}>
+                }} width="200px" mr={6} title="选择节点列表的排序方式">
                     <option value="hostname">主机名</option>
                     <option value="totalGpus">总GPU数量</option>
                     <option value="guardedNodes">守护状态</option>
@@ -592,7 +601,7 @@ function App() {
                 <Select value={filterStatus} onChange={(e) => {
                     setFilterStatus(e.target.value);
                     addEvent(`筛选：状态筛选已更改为 "${e.target.options[e.target.selectedIndex].text}"。`, 'info'); // Log filter change
-                }} width="150px" mr={6}>
+                }} width="150px" mr={6} title="根据节点守护状态筛选列表">
                     <option value="all">所有节点</option>
                     <option value="guarding">守护中</option>
                     <option value="not_guarding">未守护</option>
@@ -617,6 +626,7 @@ function App() {
                                 addEvent("筛选：搜索文本已清空。", "info");
                             }
                         }}
+                        title="输入主机名以搜索特定节点"
                     />
                 </InputGroup>
                 <Spacer />
@@ -666,10 +676,10 @@ function App() {
                         </AlertDialogBody>
 
                         <AlertDialogFooter>
-                            <Button ref={cancelRef} onClick={onStartConfirmClose}>
+                            <Button ref={cancelRef} onClick={onStartConfirmClose} title="取消启动所有守护进程">
                                 取消
                             </Button>
-                            <Button colorScheme="green" onClick={handleStartAllGuards} ml={3}>
+                            <Button colorScheme="green" onClick={handleStartAllGuards} ml={3} title="确认启动所有守护进程">
                                 启动
                             </Button>
                         </AlertDialogFooter>
@@ -694,10 +704,10 @@ function App() {
                         </AlertDialogBody>
 
                         <AlertDialogFooter>
-                            <Button ref={cancelStopRef} onClick={onStopConfirmClose}>
+                            <Button ref={cancelStopRef} onClick={onStopConfirmClose} title="取消停止所有守护进程">
                                 取消
                             </Button>
-                            <Button colorScheme="red" onClick={handleStopAllGuards} ml={3}>
+                            <Button colorScheme="red" onClick={handleStopAllGuards} ml={3} title="确认停止所有守护进程">
                                 停止
                             </Button>
                         </AlertDialogFooter>
