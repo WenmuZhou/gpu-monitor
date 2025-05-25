@@ -31,11 +31,21 @@ function NodeCard({ node }) {
                     {node.hostname}
                 </Heading>
                 <Flex align="center" mt={{ base: 2, md: 0 }}>
-                    <Badge colorScheme={guardedStatusColor} mr={3} p={1} px={3} borderRadius="full">
+                    <Badge
+                        colorScheme={guardedStatusColor}
+                        mr={3} p={1} px={3}
+                        borderRadius="full"
+                        title={node.guard_running ? "该节点GPU守护进程正在运行" : "该节点GPU守护进程未运行"}
+                    >
                         <Icon as={node.guard_running ? FaCheckCircle : FaTimesCircle} mr={1} />
                         {guardedStatusText}
                     </Badge>
-                    <Badge colorScheme={needsGuardColor} p={1} px={3} borderRadius="full">
+                    <Badge
+                        colorScheme={needsGuardColor}
+                        p={1} px={3}
+                        borderRadius="full"
+                        title={node.need_guard ? "该节点GPU功耗低，可能需要启动守护进程" : "该节点GPU功耗正常，无需守护"}
+                    >
                         <Icon as={FaExclamationTriangle} mr={1} />
                         {needsGuardText}
                     </Badge>
