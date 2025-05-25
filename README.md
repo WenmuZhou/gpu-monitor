@@ -112,10 +112,10 @@ npm start
 
 前端应用默认将在 http://localhost:3000 运行。它通常会自动在您的默认浏览器中打开一个新的标签页。
 
-### ⚙️ 配置 (可选)
+## ⚙️ 配置 (可选)
 后端 API 地址: 前端 frontend/src/services/api.js 中定义了 API_BASE_URL。如果您的后端不是在 http://localhost:5000 运行，请修改此文件。
 守护策略: 通过前端界面的“设置”按钮进行配置。
 模拟数据: backend/fake_nodes.py 文件用于模拟数据。在实际部署中，您需要将其替换为与实际 GPU 监控系统（如 Prometheus, NVIDIA-SMI, IPMI 等）集成的逻辑，或者连接到真实的服务器数据源。
 
-### 🤝 贡献
+## 🤝 贡献
 欢迎通过 Pull Request 贡献代码、报告 Bug 或提出新功能建议！
