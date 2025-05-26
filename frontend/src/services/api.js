@@ -1,8 +1,7 @@
 import axios from 'axios';
 
 // Flask 后端 API 的基本 URL
-const API_BASE_URL = 'http://localhost:5000/api';
-
+const API_BASE_URL = 'http://' + window.location.hostname + ':5000/api';
 export const fetchNodes = async () => {
     try {
         // 请求所有节点数据

@@ -1,121 +1,144 @@
-# GPU 节点监控与智能守护系统
+# GPU 节点监控系统
 
-![仪表盘概览](images/zhuye.png)
+这是一个用于监控 GPU 节点并提供自动守护功能的系统。
 
-这是一个基于 Flask 后端和 React 前端构建的 GPU 节点监控与智能守护系统。它旨在帮助用户实时监控多台服务器上的 GPU 状态（包括温度、利用率、显存和功耗），并提供自动或手动启动/停止 GPU 守护进程的功能，以优化资源利用和管理。
+## 目录
 
-## 🚀 主要特性
+- [GPU 节点监控系统](#gpu-节点监控系统)
+  - [目录](#目录)
+  - [功能](#功能)
+  - [技术栈](#技术栈)
+  - [快速启动 (开发环境)](#快速启动-开发环境)
+    - [先决条件](#先决条件)
+    - [一键启动脚本](#一键启动脚本)
+    - [截图](#截图)
+  - [项目结构](#项目结构)
+  - [配置](#配置)
+  - [日志](#日志)
+  - [停止服务](#停止服务)
 
-* **实时节点监控：**
+## 功能
 
-    * 展示所有 GPU 节点的详细信息，包括主机名、GPU 数量。
-    * 每块 GPU 的实时数据：温度、利用率、已用/总显存、功耗。
-* **概览统计：** 仪表盘顶部提供总节点数、守护中节点数、需要守护节点数、总 GPU 数、总 GPU 功耗和平均 GPU 利用率等关键指标。
-* **智能守护策略：**
+* 实时监控 GPU 节点的状态、CPU 使用率、内存使用和平均功耗。
+* 显示每个 GPU 的详细信息，包括温度、利用率、显存使用和功耗。
+* 自动守护功能：根据预设策略（例如，低功耗不活跃）自动启动 GPU 守护进程。
+* 手动启动/停止所有节点的守护进程。
+* 可配置的守护策略（不活跃判断间隔、活跃功耗阈值）。
+* 可配置的数据刷新间隔。
+* 事件日志记录，方便追踪系统操作和异常。
+* 节点列表的排序、筛选和搜索功能。
 
-    * **自动守护：** 可配置当 GPU 在设定的时间内平均功耗低于阈值时，自动启动守护进程（例如，关闭不活跃的 GPU 任务）。
-    * **手动控制：** 一键启动或停止所有节点的守护进程。
-    * **可配置策略：** 用户可以通过设置界面调整“不活跃判断间隔”和“活跃功耗阈值”。
-* **事件日志：** 实时记录系统的重要操作和状态变化，方便追踪和排查问题。
-* **数据筛选与排序：**
+## 技术栈
 
-    * 按主机名、GPU 数量、守护状态等对节点进行排序。
-    * 按守护状态（所有、守护中、未守护、需要守护）进行筛选。
-    * 支持按主机名进行模糊搜索。
-* **友好的用户界面：** 使用 Chakra UI 构建，提供响应式和美观的用户体验。
-* **确认弹窗：** 启动/停止所有守护进程时，提供确认弹窗，防止误操作。
+**前端:**
+* React
+* Chakra UI (用于组件和样式)
+* `react-icons` (用于图标)
 
-## 🛠️ 技术栈
+**后端:**
+* Python Flask (作为 RESTful API)
+* （您的后端可能使用的其他 Python 库，例如用于 GPU 监控的 `pynvml` 或其他系统信息库）
 
-**后端 (Python Flask):**
+## 快速启动 (开发环境)
 
-* **Flask:** 轻量级 Python Web 框架，用于构建 API。
-* **Flask-CORS:** 处理跨域请求。
-* **Loguru:** 强大的日志库，方便记录系统事件。
-* **假数据模拟:** `fake_nodes.py` 用于模拟 GPU 节点数据和守护行为，方便开发和测试，实际部署时可替换为真实的数据采集逻辑。
+### 先决条件
 
-**前端 (React):**
+在运行本系统之前，请确保您的系统已安装以下环境：
 
-* **React:** 用于构建用户界面的 JavaScript 库。
-* **Chakra UI:** React 组件库，提供美观且可访问的 UI 组件。
-* **Axios:** 基于 Promise 的 HTTP 客户端，用于与后端 API 交互。
-* **React Hooks:** 充分利用 `useState`, `useEffect`, `useCallback`, `useMemo`, `useRef`, `useDisclosure` 等钩子管理组件状态和生命周期。
+* **Python 3.x** (后端需要)
+* **Node.js 和 npm** (前端需要)
 
-## 🖥️ 运行截图
+脚本会自动尝试安装 Node.js 和 npm，但如果自动安装失败，请根据您的操作系统手动安装。
 
-### 仪表盘概览
+### 一键启动脚本
 
-![仪表盘概览](images/zhuye.png)
+我们提供了一个便捷的脚本 `start_dev.sh` (适用于 Linux/macOS) 来一键启动后端和前端服务。
 
+1.  **下载项目:**
+    克隆或下载本项目的代码到您的本地机器。
 
-### 节点信息
+2.  **赋予脚本执行权限 (Linux/macOS):**
+    打开终端，导航到项目根目录，然后运行以下命令：
+    ```bash
+    chmod +x start_dev.sh
+    ```
 
-![设置界面](images/node.png)
+3.  **运行脚本:**
+    在项目根目录运行脚本：
+    ```bash
+    ./start_dev.sh
+    ```
+    脚本将执行以下操作：
+    * 检查并尝试自动安装 Node.js 和 npm（如果未安装）。
+    * 进入 `backend` 目录，安装 Python 依赖，并在后台启动 Flask 后端服务。后端日志将输出到 `./tmp/backend.log`。
+    * 进入 `frontend` 目录，安装 npm 依赖，并在前台启动 React 前端应用。前端日志将同步输出到 `./tmp/frontend.log`，同时也会在当前终端显示。
 
-### 设置界面
+4.  **访问应用:**
+    前端应用启动后，您可以通过浏览器访问：
+    [http://localhost:3000](http://localhost:3000)
 
-![确认弹窗](images/setting.png)
+### 截图
 
-## 🚀 快速启动
+您可以在此处插入应用的实际运行截图，例如：
 
-请确保您的系统已安装以下环境：
+* **主界面截图:** ![](./images/zhuye.png)
+* **设置界面截图:** ![](./images/setting.png)
+* **节点详情截图:** ![](./images/node.png)
 
-* **Python 3.8+**
-* **Node.js 14+ 及 npm (或 yarn)**
-
-### 1. 克隆仓库
-
-首先，将项目仓库克隆到您的本地机器：
-
-```bash
-git clone https://github.com/WenmuZhou/gpu-monitor.git
-cd gpu-monitor
-```
-
-### 2. 后端设置与运行
-安装依赖
-进入 backend 目录，并安装所需的 Python 依赖：
-
-```bash
-cd backend
-
-# 安装依赖
-pip install -r requirements.txt
-```
-
-运行后端服务
-安装完成后，即可运行 Flask 后端服务：
-
-```bash
-python app.py
-```
-
-后端服务默认将在 http://localhost:5000 运行。如果一切正常，您会看到类似“* Running on http://127.0.0.1:5000 (Press CTRL+C to quit)”的输出。
-
-### 3. 前端设置与运行
-安装依赖
-在新终端窗口中，返回项目根目录（如果之前进入了 backend），然后进入 frontend 目录，并安装所需的 Node.js 依赖：
+## 项目结构
 
 ```bash
-cd frontend
-
-# 安装依赖
-npm install
+gpu-monitor/
+├── backend/                  # 后端 Flask 应用
+│   ├── app.py                # Flask 主应用文件
+│   ├── requirements.txt      # 后端 Python 依赖
+│   └── ...
+├── frontend/                 # 前端 React 应用
+│   ├── public/               # 静态文件 (index.html, favicon.ico 等)
+│   ├── src/                  # React 源代码
+│   │   ├── components/       # 可复用 UI 组件 (NodeCard, EventLog, SettingsModal, OverviewStats, ControlPanel, GlobalActions)
+│   │   ├── hooks/            # 自定义 React Hooks (useNodeMonitoring)
+│   │   ├── services/         # API 调用服务
+│   │   ├── App.js            # 主应用组件
+│   │   └── index.js          # React 应用入口
+│   └── package.json          # 前端依赖配置
+├── tmp/                      # 统一的日志输出目录 (由脚本自动创建)
+│   ├── backend.log           # 后端服务日志
+│   └── frontend.log          # 前端应用日志
+├── start_dev.sh              # 一键启动脚本 (Linux/macOS)
+└── README.md                 # 本文件
 ```
 
-运行前端应用
-安装完成后，即可运行 React 前端应用：
 
-```bash
-npm start
-```
+## 配置
 
-前端应用默认将在 http://localhost:3000 运行。它通常会自动在您的默认浏览器中打开一个新的标签页。
+您可以通过前端界面的“设置”按钮修改以下配置：
 
-## ⚙️ 配置 (可选)
-后端 API 地址: 前端 frontend/src/services/api.js 中定义了 API_BASE_URL。如果您的后端不是在 http://localhost:5000 运行，请修改此文件。
-守护策略: 通过前端界面的“设置”按钮进行配置。
-模拟数据: backend/fake_nodes.py 文件用于模拟数据。在实际部署中，您需要将其替换为与实际 GPU 监控系统（如 Prometheus, NVIDIA-SMI, IPMI 等）集成的逻辑，或者连接到真实的服务器数据源。
+* **自动守护：** 开启/关闭自动守护功能。
+* **不活跃判断间隔：** 设置判断 GPU 不活跃的时间段（分钟）。
+* **活跃功耗阈值：** 设置判断 GPU 活跃的功耗阈值（瓦特）。
+* **数据刷新间隔：** 设置页面自动刷新节点数据的时间间隔。
 
-## 🤝 贡献
-欢迎通过 Pull Request 贡献代码、报告 Bug 或提出新功能建议！
+## 日志
+
+所有服务日志都将统一输出到项目根目录下的 `./tmp` 文件夹：
+
+* `./tmp/backend.log`：后端 Flask 服务的日志。
+* `./tmp/frontend.log`：前端 React 应用的日志（会同步显示在终端）。
+
+## 停止服务
+
+* **停止前端：** 在运行 `start_dev.sh` 脚本的终端中，直接按 `Ctrl+C` 即可停止前台运行的前端应用。
+* **停止后端：** 后端服务在后台运行。您可以使用以下命令停止它（请根据 `start_dev.sh` 脚本输出的 PID 替换 `$BACKEND_PID`）：
+    ```bash
+    kill $BACKEND_PID
+    ```
+    或者，更通用的方法（请谨慎使用，因为它会杀死所有匹配的 Python 进程）：
+    ```bash
+    pkill -f "python app.py"
+    ```
+* **停止所有相关进程（谨慎使用）：**
+    ```bash
+    pkill -f "python app.py"
+    pkill -f "npm start"
+    ```
