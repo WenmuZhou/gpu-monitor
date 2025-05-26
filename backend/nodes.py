@@ -73,7 +73,7 @@ class Node:
 
         self.power_history = defaultdict(lambda: deque())
         self.is_local = self._check_is_local()
-        self.tmp_folder = f"./tmp/{self.hostname}"
+        self.tmp_folder = f"../tmp/{self.hostname}"
         os.makedirs(self.tmp_folder, exist_ok=True)
         self.guard_name = f"gpu_guard_{self.hostname}"
         self.update_gpu_info()
@@ -101,23 +101,28 @@ class Node:
             pass
         return False
 
-    def run_cmd(self, cmd: str, timeout=30) -> str:
+    def run_cmd(self, cmd: str, timeout=300) -> str:
         try:
-            if self.is_local:
-                result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+            cmd = cmd
+            if not self.is_local:
+                cmd = ["ssh", self.hostname, cmd]
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout, shell=True)
+            if result.returncode == 0:
+                return True, result.stdout.strip()
+            elif result.returncode == 1 and not result.stderr:
+                return True, result.stdout.strip() # 返回空字符串表示未找到，但命令本身没有错误
+            elif result.returncode == -15 and 'pkill' in cmd:
+                return True, ""
             else:
-                ssh_cmd = ["ssh", self.hostname, cmd]
-                result = subprocess.run(ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
-            if result.returncode != 0:
-                logger.info(f"[{self.hostname}] 命令执行失败: {result.stderr.strip()}")
-                return ""
-            return result.stdout.strip()
+                logger.error(f"[{self.hostname}] {cmd} 执行失败 (返回码: {result.returncode}): {result.stderr.strip()}")
+                return False, ""
+            
         except subprocess.TimeoutExpired:
-            logger.info(f"[{self.hostname}] 命令执行超时")
-            return ""
+            logger.info(f"[{self.hostname}] {cmd} 执行超时")
+            return False, ""
         except Exception as e:
-            logger.info(f"[{self.hostname}] 运行命令异常: {e}")
-            return ""
+            logger.info(f"[{self.hostname}] {cmd} 执行异常: {e}")
+            return False, ""
 
     def update_time(self):
         self.last_update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -127,8 +132,8 @@ class Node:
             "nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu,"
             "memory.used,memory.total,power.draw --format=csv,noheader,nounits"
         )
-        output = self.run_cmd(query)
-        if not output:
+        status, output = self.run_cmd(query)
+        if status == False:
             return []
 
         self.gpus = []
@@ -152,6 +157,15 @@ class Node:
             except Exception as e:
                 logger.info(f"[{self.hostname}] 解析 GPU 信息失败: {e}")
 
+    def record_power(self, gpu_index: int, power_draw: float):
+        now = datetime.now()
+        history = self.power_history[gpu_index]
+        history.append((now, power_draw))
+
+        cutoff = now - timedelta(minutes=30)
+        while history and history[0][0] < cutoff:
+            history.popleft()
+
     def update_guard_status(self):
         """
         通过进程名关键字判断守护进程是否运行。
@@ -159,11 +173,11 @@ class Node:
         """
         # ps命令查找包含关键字的进程（排除grep自身进程）
         cmd = f"ps aux | grep '{self.guard_name}' | grep -v grep"
-        result = self.run_cmd(cmd)
-
+        status, result = self.run_cmd(cmd)
+        
         self.update_time()
 
-        if result:
+        if status == True and len(result) > 0:
             # 找到匹配的进程行，守护进程在运行
             self.is_guard_running = True
         else:
@@ -184,8 +198,8 @@ class Node:
             return
 
         cmd = f"cd {script_dir} && bash start_task.sh {self.guard_name} {os.path.join(self.tmp_folder, 'gpu_guard.log')}"
-        output = self.run_cmd(cmd)
-        if not output:
+        status, output = self.run_cmd(cmd)
+        if status == False:
             logger.warning(f"[{self.hostname}] 启动守护进程失败")
         else:
             time.sleep(1)
@@ -201,8 +215,8 @@ class Node:
             logger.info(f"[{self.hostname}] 守护进程未运行")
             return
         cmd = f"pkill -f {self.guard_name}"
-        output = self.run_cmd(cmd)
-        if not output:
+        status, output = self.run_cmd(cmd)
+        if status == False:
             logger.error(f"[{self.hostname}] 终止守护进程失败")
         else:
             time.sleep(1)
@@ -252,9 +266,6 @@ class Nodes:
     def __init__(self, host_file_path: str):
         self.host_file_path = host_file_path
         self.nodes = self._load_nodes()
-        # 打印加载的节点信息
-        for node in self.nodes:
-            logger.info(f"加载节点: {node.hostname} 完成")
 
     def _load_nodes(self) -> List[Node]:
         nodes = []
@@ -269,6 +280,7 @@ class Nodes:
                     hostname = parts[0]  # 取第一个字段为机器名
                     node = Node(hostname)
                     nodes.append(node)
+                    logger.info(f"加载节点: {node.hostname} 完成")
         except Exception as e:
             logger.info(f"读取host文件失败: {e}")
         return nodes
@@ -292,7 +304,6 @@ class Nodes:
     def stop_guard(self, host_names: Union[List[str], None] = None):
         if host_names is None or len(host_names) == 0:
             host_names = [node.hostname for node in self.nodes]
-        print(host_names)
         for node in self.nodes:
             if node.hostname in host_names:
                 node.stop_guard()
