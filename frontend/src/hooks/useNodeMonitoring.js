@@ -31,7 +31,7 @@ const useNodeMonitoring = () => {
     const [activePowerThreshold, setActivePowerThreshold] = useState(100);
     const [guardIntervalMinutes, setGuardIntervalMinutes] = useState(5);
     const [refreshInterval, setRefreshInterval] = useState(5000);
-    const [isAutoGuardEnabled, setIsAutoGuardEnabled] = useState(false);
+    const [isAutoGuardEnabled, setIsAutoGuardEnabled] = useState(true);
     const [isSavingPolicy, setIsSavingPolicy] = useState(false);
 
     // loadNodes 函数，负责获取数据和执行自动守护逻辑
