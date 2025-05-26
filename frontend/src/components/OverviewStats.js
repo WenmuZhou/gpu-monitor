@@ -27,11 +27,11 @@ function OverviewStats({ totalNodes, guardedNodes, needGuardNodes, totalGpus, av
                 <StatNumber fontSize="2xl">{totalGpus}</StatNumber>
             </Stat>
             <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="orange.50" title="所有GPU的平均功耗">
-                <StatLabel display="flex" alignItems="center"><Icon as={FaBolt} mr={2} />平均功耗 (W)</StatLabel>
+                <StatLabel display="flex" alignItems="center"><Icon as={FaBolt} mr={2} />平均功耗</StatLabel>
                 <StatNumber fontSize="2xl">{averageTotalGpuPowerDraw.toFixed(2)} W</StatNumber>
             </Stat>
             <Stat p={5} shadow="md" borderWidth="1px" borderRadius="lg" bg="teal.50" title="所有GPU的平均利用率">
-                <StatLabel display="flex" alignItems="center"><Icon as={FaTachometerAlt} mr={2} />平均GPU利用率 (%)</StatLabel>
+                <StatLabel display="flex" alignItems="center"><Icon as={FaTachometerAlt} mr={2} />平均GPU利用率</StatLabel>
                 <StatNumber fontSize="2xl">{averageGpuUtilization.toFixed(2)} %</StatNumber>
             </Stat>
         </SimpleGrid>
