@@ -7,45 +7,25 @@ from datetime import datetime, timedelta
 from typing import List, Union
 from loguru import logger
 
-# 当前脚本文件夹
-script_dir = os.path.dirname(os.path.abspath(__file__))
-
 from dataclasses import dataclass
 import json
+from fabric import Connection, Config
+from paramiko.ssh_exception import SSHException, NoValidConnectionsError
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 @dataclass
 class GPU:
     index: int
     name: str
-    temperature: float          # 摄氏度
-    utilization: float          # 百分比
-    memory_used: int            # MiB
-    memory_total: int           # MiB
-    power_draw: float           # W
-
-    @classmethod
-    def from_dict(cls, data: dict):
-        """从字典创建 GPU 实例"""
-        return cls(
-            index=int(data.get('index', 0)),
-            name=str(data.get('name', 'Unknown')),
-            temperature=float(data.get('temperature', 0)),
-            utilization=float(data.get('utilization', 0)),
-            memory_used=int(data.get('memory_used', 0)),
-            memory_total=int(data.get('memory_total', 0)),
-            power_draw=float(data.get('power_draw', 0)),
-        )
+    temperature: float
+    utilization: float
+    memory_used: int
+    memory_total: int
+    power_draw: float
 
     def to_dict(self):
-        return {
-            'index': self.index,
-            'name': self.name,
-            'temperature': self.temperature,
-            'utilization': self.utilization,
-            'memory_used': self.memory_used,
-            'memory_total': self.memory_total,
-            'power_draw': self.power_draw,
-        }
+        return self.__dict__
 
     def update(self, **kwargs):
         for key, value in kwargs.items():
@@ -54,21 +34,18 @@ class GPU:
 
     def __str__(self):
         return (
-            f"[GPU {self.index}] {self.name} | "
-            f"温度: {self.temperature}°C | "
-            f"利用率: {self.utilization}% | "
-            f"显存: {self.memory_used}/{self.memory_total} MiB | "
-            f"功率: {self.power_draw} W | "
+            f"[GPU {self.index}] {self.name} | 温度: {self.temperature}°C | "
+            f"利用率: {self.utilization}% | 显存: {self.memory_used}/{self.memory_total} MiB | "
+            f"功率: {self.power_draw} W"
         )
 
 
 class Node:
-    # 一个在管理本机和远程机器的类，所有执行命令和文件操作相关的函数都需要支持本地和远程机器
     def __init__(self, hostname: str, need_guard_interval=10, active_power_threshold=100):
         self.hostname = hostname
         self.gpus = []
         self.is_guard_running = False
-        self.need_guard_interval = need_guard_interval # 分钟级别的死亡时间
+        self.need_guard_interval = need_guard_interval
         self.active_power_threshold = active_power_threshold
 
         self.power_history = defaultdict(lambda: deque())
@@ -76,52 +53,65 @@ class Node:
         self.tmp_folder = f"../tmp/{self.hostname}"
         os.makedirs(self.tmp_folder, exist_ok=True)
         self.guard_name = f"gpu_guard_{self.hostname}"
-        self.update_gpu_info()
-        self.update_guard_status()
         self.last_update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        
+        self.conn = None
+        self.is_online = self._init_connection_if_remote()
+
+        self.update_gpu_info()
+        self.update_guard_status()
 
     def _check_is_local(self) -> bool:
-        local_hostnames = {
-            socket.gethostname(),
-            socket.getfqdn(),
-            "localhost",
-            "127.0.0.1"
-        }
+        local_hostnames = {socket.gethostname(), socket.getfqdn(), "localhost", "127.0.0.1"}
         if self.hostname in local_hostnames:
             return True
-        # 额外尝试解析hostname的IP对比本机IP
         try:
             host_ip = socket.gethostbyname(self.hostname)
             local_ips = socket.gethostbyname_ex(socket.gethostname())[2]
-            if host_ip in local_ips:
-                return True
+            return host_ip in local_ips
         except Exception:
-            pass
-        return False
+            return False
+
+    def _init_connection_if_remote(self) -> bool:
+        if self.is_local:
+            return True
+        try:
+            config = Config(overrides={'connect_timeout': 5})
+            self.conn = Connection(self.hostname, config=config)
+            self.conn.open()
+            return True
+        except Exception as e:
+            logger.warning(f"[{self.hostname}] SSH连接失败: {e}")
+            self.conn = None
+            return False
 
     def run_cmd(self, cmd: str, timeout=300) -> str:
-        try:
-            cmd = cmd
-            if not self.is_local:
-                cmd = ["ssh", self.hostname, cmd]
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout, shell=True)
-            if result.returncode == 0:
-                return True, result.stdout.strip()
-            elif result.returncode == 1 and not result.stderr:
-                return True, result.stdout.strip() # 返回空字符串表示未找到，但命令本身没有错误
-            elif result.returncode == -15 and 'pkill' in cmd:
-                return True, ""
-            else:
-                logger.error(f"[{self.hostname}] {cmd} 执行失败 (返回码: {result.returncode}): {result.stderr.strip()}")
-                return False, ""
-            
-        except subprocess.TimeoutExpired:
-            logger.info(f"[{self.hostname}] {cmd} 执行超时")
+        if not self.is_online:
+            logger.warning(f"[{self.hostname}] 离线状态，跳过命令: {cmd}")
             return False, ""
+        try:
+            if self.is_local:
+                result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout, shell=True)
+                if result.returncode in (0, 1):
+                    return True, result.stdout.strip()
+                if result.returncode == -15 and 'pkill' in cmd:
+                    return True, ""
+                logger.error(f"[{self.hostname}] 本地命令失败: {result.stderr.strip()}")
+                return False, ""
+            else:
+                if self.conn is None:
+                    self.is_online = self._init_connection_if_remote()
+                    if not self.is_online:
+                        return False, ""
+                result = self.conn.run(cmd, hide=True, timeout=timeout, warn=True)
+                return True, result.stdout.strip()
+        except (SSHException, NoValidConnectionsError) as e:
+            logger.warning(f"[{self.hostname}] SSH连接中断: {e}，尝试重连")
+            self.conn = None
+            self.is_online = self._init_connection_if_remote()
+            return self.run_cmd(cmd, timeout)
         except Exception as e:
-            logger.info(f"[{self.hostname}] {cmd} 执行异常: {e}")
+            logger.warning(f"[{self.hostname}] 命令执行异常: {e}")
             return False, ""
 
     def update_time(self):
@@ -129,11 +119,11 @@ class Node:
 
     def update_gpu_info(self) -> List:
         query = (
-            "nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu,"
+            "nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu," 
             "memory.used,memory.total,power.draw --format=csv,noheader,nounits"
         )
         status, output = self.run_cmd(query)
-        if status == False:
+        if not status:
             return []
 
         self.gpus = []
@@ -167,21 +157,10 @@ class Node:
             history.popleft()
 
     def update_guard_status(self):
-        """
-        通过进程名关键字判断守护进程是否运行。
-        process_keyword: 守护进程脚本名或者唯一关键字，用于进程匹配。
-        """
-        # ps命令查找包含关键字的进程（排除grep自身进程）
         cmd = f"ps aux | grep '{self.guard_name}' | grep -v grep"
         status, result = self.run_cmd(cmd)
-        
         self.update_time()
-
-        if status == True and len(result) > 0:
-            # 找到匹配的进程行，守护进程在运行
-            self.is_guard_running = True
-        else:
-            self.is_guard_running =  False
+        self.is_guard_running = bool(status and result)
 
     def update_guard_policy(self, need_guard_interval, active_power_threshold):
         self.active_power_threshold = active_power_threshold
@@ -199,7 +178,7 @@ class Node:
 
         cmd = f"cd {script_dir} && bash start_task.sh {self.guard_name} {os.path.join(self.tmp_folder, 'gpu_guard.log')}"
         status, output = self.run_cmd(cmd)
-        if status == False:
+        if not status:
             logger.warning(f"[{self.hostname}] 启动守护进程失败")
         else:
             time.sleep(1)
@@ -214,13 +193,13 @@ class Node:
         if not self.is_guard_running:
             logger.info(f"[{self.hostname}] 守护进程未运行")
             return
+
         cmd = f"pkill -f {self.guard_name}"
         status, output = self.run_cmd(cmd)
-        if status == False:
+        if not status:
             logger.error(f"[{self.hostname}] 终止守护进程失败")
         else:
             time.sleep(1)
-
             self.update_guard_status()
             if not self.is_guard_running:
                 logger.info(f"[{self.hostname}] 守护进程已终止")
@@ -228,38 +207,27 @@ class Node:
                 logger.warning(f"[{self.hostname}] 守护进程终止失败")
 
     def need_guard(self) -> bool:
-        now = datetime.now()  # 只计算一次当前时间
-
-        # 遍历所有 GPU
+        now = datetime.now()
         for index, records in self.power_history.items():
             recent = [p for t, p in records if t >= now - timedelta(minutes=self.need_guard_interval)]
-
-            # 如果近期没有功耗数据，我们认为这个 GPU 处于不活跃状态，需要守护
             if not recent:
-                return True  # 发现一个不活跃的GPU，立即返回True（需要守护）
-
+                return True
             avg_power = sum(recent) / len(recent)
-
-            # 如果平均功耗低于活跃阈值，也认为这个 GPU 处于不活跃状态，需要守护
-            if avg_power < self.active_power_threshold:  # 重点修改：从 >= 改为 <
-                return True  # 发现一个不满足活跃条件的GPU，立即返回True（需要守护）
-
-        # 如果循环结束，意味着所有 GPU 都满足了活跃条件（近期有数据且功耗 >= active_power_threshold）
-        return False  # 所有GPU都活跃，不需要守护
+            if avg_power < self.active_power_threshold:
+                return True
+        return False
 
     def to_dict(self) -> dict:
-        """返回当前机器的GPU信息和守护进程状态的JSON字符串"""
         self.update_gpu_info()
         self.update_guard_status()
-
-        data = {
+        return {
             'hostname': self.hostname,
             'gpus': [gpu.to_dict() for gpu in self.gpus],
             'guard_running': self.is_guard_running,
             'last_updated': self.last_update_time,
-            'need_guard': self.need_guard()
+            'need_guard': self.need_guard(),
+            'is_online': self.is_online
         }
-        return data
 
 
 class Nodes:
@@ -274,10 +242,9 @@ class Nodes:
                 for line in f:
                     line = line.strip()
                     if not line or line.startswith("#"):
-                        continue  # 跳过空行和注释
-                    # 格式示例：columbia-induced-pride-gvl-jun-zhou10-master-0 slots=8
+                        continue
                     parts = line.split()
-                    hostname = parts[0]  # 取第一个字段为机器名
+                    hostname = parts[0]
                     node = Node(hostname)
                     nodes.append(node)
                     logger.info(f"加载节点: {node.hostname} 完成")
@@ -286,15 +253,14 @@ class Nodes:
         return nodes
 
     def to_dict(self) -> List[dict]:
-        nodes_data = [node.to_dict() for node in self.nodes]
-        return nodes_data
+        return [node.to_dict() for node in self.nodes]
 
     def update(self):
         for node in self.nodes:
             node.update()
 
     def start_guard(self, host_names: Union[List[str], None] = None):
-        if host_names is None or len(host_names) == 0:
+        if not host_names:
             host_names = [node.hostname for node in self.nodes]
         for node in self.nodes:
             if node.hostname in host_names:
@@ -302,7 +268,7 @@ class Nodes:
         return {node.hostname: node.is_guard_running for node in self.nodes}
 
     def stop_guard(self, host_names: Union[List[str], None] = None):
-        if host_names is None or len(host_names) == 0:
+        if not host_names:
             host_names = [node.hostname for node in self.nodes]
         for node in self.nodes:
             if node.hostname in host_names:
@@ -313,9 +279,9 @@ class Nodes:
         for node in self.nodes:
             node.update_guard_policy(need_guard_interval, active_power_threshold)
 
+
 if __name__ == "__main__":
-    nodes = Nodes("host")
-    print(nodes.to_dict())
-    # Simulate starting and stopping guards
-    nodes.start_guard()
-    nodes.stop_guard()
+    nodes = Nodes("/etc/volcano/all.host")
+    for node in nodes.nodes:
+        print(node.to_dict())
+    # nodes.stop_guard()

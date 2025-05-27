@@ -1,6 +1,6 @@
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS # 引入 Flask-CORS，用于处理跨域问题
-from fake_nodes import Nodes  # 引入 fake_nodes.py 中的 Nodes 类
+from nodes import Nodes  # 引入 fake_nodes.py 中的 Nodes 类
 from loguru import logger
 
 app = Flask(__name__)
@@ -8,7 +8,7 @@ app = Flask(__name__)
 # 在生产环境中，建议只允许您的前端应用的特定来源。
 CORS(app) # 默认允许所有来源
 
-nodes_manager = Nodes("all.host") # 初始化节点管理器
+nodes_manager = Nodes("/etc/volcano/all.host") # 初始化节点管理器
 
 @app.route('/')
 def index():

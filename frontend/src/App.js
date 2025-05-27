@@ -2,7 +2,8 @@ import React, { useMemo, useRef } from 'react';
 import {
     Container, Text, Spinner, useDisclosure,
     AlertDialog, AlertDialogBody, AlertDialogFooter, AlertDialogHeader, AlertDialogContent, AlertDialogOverlay,
-    Button, SimpleGrid
+    Button, SimpleGrid,
+    Box
 } from '@chakra-ui/react';
 
 // 引入自定义 Hook
@@ -16,14 +17,16 @@ import ControlPanel from './components/ControlPanel';
 import GlobalActions from './components/GlobalActions';
 
 function App() {
-    // 使用自定义 Hook 封装逻辑和状态
     const {
-        nodes, initialLoading, isUpdating, error, events, onClearEvents, addEvent,
+        nodes, initialLoading, error, events, onClearEvents, addEvent,
         activePowerThreshold, setActivePowerThreshold, guardIntervalMinutes, setGuardIntervalMinutes,
         refreshInterval, setRefreshInterval, isAutoGuardEnabled, setIsAutoGuardEnabled,
         isSavingPolicy, handleSavePolicy,
         totalNodes, guardedNodes, needGuardNodes, totalGpus, averageTotalGpuPowerDraw, averageGpuUtilization,
-        loadNodes, handleStartAllGuards, handleStopAllGuards
+        loadNodes,
+        handleStartAllGuards, handleStopAllGuards,
+        onlineNodesCount,
+        isStartingAllGuards, isStoppingAllGuards,
     } = useNodeMonitoring();
 
     // Modal disclosure for SettingsModal
@@ -45,34 +48,47 @@ function App() {
     // Memoized filtered and sorted nodes
     const filteredAndSortedNodes = useMemo(() => {
         let currentNodes = [...nodes];
-        if (filterStatus === 'guarding') {
+
+        // --- 统一的筛选逻辑 ---
+        // 按照状态进行筛选
+        if (filterStatus === 'online') {
+            currentNodes = currentNodes.filter(node => node.isOnline); // 假设 node 对象有 'isOnline' 属性
+        } else if (filterStatus === 'offline') {
+            currentNodes = currentNodes.filter(node => !node.isOnline); // 假设 node 对象有 'isOnline' 属性
+        } else if (filterStatus === 'guarding') {
             currentNodes = currentNodes.filter(node => node.guard_running);
         } else if (filterStatus === 'not_guarding') {
             currentNodes = currentNodes.filter(node => !node.guard_running);
         } else if (filterStatus === 'needs_guard') {
             currentNodes = currentNodes.filter(node => node.need_guard);
         }
+        // --- 结束状态筛选 ---
+
+        // 主机名搜索筛选
         if (filterText) {
             const lowerCaseFilterText = filterText.toLowerCase();
             currentNodes = currentNodes.filter(node =>
                 node.hostname.toLowerCase().includes(lowerCaseFilterText)
             );
         }
+
+        // 排序逻辑
         currentNodes.sort((a, b) => {
             if (sortBy === 'hostname') {
                 return a.hostname.localeCompare(b.hostname);
             } else if (sortBy === 'totalGpus') {
                 return b.gpus.length - a.gpus.length;
             } else if (sortBy === 'guardedNodes') {
+                // 守护状态排序 (true 优先)
                 return (b.guard_running ? 1 : 0) - (a.guard_running ? 1 : 0);
             } else if (sortBy === 'needGuard') {
+                // 需要守护状态排序 (true 优先)
                 return (a.need_guard ? 1 : 0) - (b.need_guard ? 1 : 0);
             }
             return 0;
         });
         return currentNodes;
-    }, [nodes, filterText, sortBy, filterStatus]);
-
+    }, [nodes, filterText, sortBy, filterStatus]); // 确保 filterStatus 作为依赖项
 
     if (initialLoading) {
         return (
@@ -96,12 +112,13 @@ function App() {
         <Container maxW="container.xl" py={8} bg="white" minHeight="100vh">
             <GlobalActions
                 isAutoGuardEnabled={isAutoGuardEnabled}
-                isUpdating={isUpdating}
                 initialLoading={initialLoading}
                 onStartConfirmOpen={onStartConfirmOpen}
                 onStopConfirmOpen={onStopConfirmOpen}
                 onSettingsModalOpen={onSettingsModalOpen}
                 nodes={nodes}
+                isStartingAllGuards={isStartingAllGuards}
+                isStoppingAllGuards={isStoppingAllGuards}
             />
 
             <OverviewStats
@@ -111,22 +128,32 @@ function App() {
                 totalGpus={totalGpus}
                 averageTotalGpuPowerDraw={averageTotalGpuPowerDraw}
                 averageGpuUtilization={averageGpuUtilization}
+                onlineNodesCount={onlineNodesCount}
             />
 
             <ControlPanel
                 sortBy={sortBy} setSortBy={setSortBy}
                 filterStatus={filterStatus} setFilterStatus={setFilterStatus}
                 filterText={filterText} setFilterText={setFilterText}
-                addEvent={addEvent} // 传递 addEvent 给 ControlPanel
+                addEvent={addEvent}
             />
 
-            <EventLog events={events} onClearEvents={onClearEvents} />
+            <Box mt={6} mb={6}>
+                <EventLog events={events} onClearEvents={onClearEvents} />
+            </Box>
 
-            <SimpleGrid columns={1} spacing={6}>
-                {filteredAndSortedNodes.map(node => (
-                    <NodeCard key={node.hostname} node={node} />
-                ))}
-            </SimpleGrid>
+
+            {filteredAndSortedNodes.length === 0 && !initialLoading && !error ? (
+                <Text textAlign="center" mt={6} color="gray.500">
+                    没有找到符合条件的节点。
+                </Text>
+            ) : (
+                <SimpleGrid columns={1} spacing={6} mt={6}>
+                    {filteredAndSortedNodes.map(node => (
+                        <NodeCard key={node.hostname} node={node} addEvent={addEvent} />
+                    ))}
+                </SimpleGrid>
+            )}
 
             <SettingsModal
                 isOpen={isSettingsModalOpen}
@@ -144,7 +171,7 @@ function App() {
                 addEvent={addEvent}
             />
 
-            {/* Start All Guards Confirmation Dialog */}
+            {/* 启动所有守护进程的确认对话框 */}
             <AlertDialog
                 isOpen={isStartConfirmOpen}
                 leastDestructiveRef={cancelRef}
@@ -166,7 +193,7 @@ function App() {
                             </Button>
                             <Button colorScheme="green" onClick={() => {
                                 handleStartAllGuards();
-                                onStartConfirmClose(); // 确保关闭弹窗
+                                onStartConfirmClose();
                             }} ml={3} title="确认启动所有守护进程">
                                 启动
                             </Button>
@@ -175,7 +202,7 @@ function App() {
                 </AlertDialogOverlay>
             </AlertDialog>
 
-            {/* Stop All Guards Confirmation Dialog */}
+            {/* 停止所有守护进程的确认对话框 */}
             <AlertDialog
                 isOpen={isStopConfirmOpen}
                 leastDestructiveRef={cancelStopRef}
@@ -197,7 +224,7 @@ function App() {
                             </Button>
                             <Button colorScheme="red" onClick={() => {
                                 handleStopAllGuards();
-                                onStopConfirmClose(); // 确保关闭弹窗
+                                onStopConfirmClose();
                             }} ml={3} title="确认停止所有守护进程">
                                 停止
                             </Button>

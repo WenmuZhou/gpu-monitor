@@ -22,6 +22,8 @@ function ControlPanel({ sortBy, setSortBy, filterStatus, setFilterStatus, filter
                 addEvent(`筛选：状态筛选已更改为 "${e.target.options[e.target.selectedIndex].text}"。`, 'info');
             }} width={{ base: "full", sm: "150px" }} mr={{ base: 0, sm: 6 }} mb={{ base: 4, sm: 0 }} title="根据节点守护状态筛选列表">
                 <option value="all">所有节点</option>
+                <option value="online">仅在线</option> {/* NEW: Online filter option */}
+                <option value="offline">仅离线</option> {/* NEW: Offline filter option */}
                 <option value="guarding">守护中</option>
                 <option value="not_guarding">未守护</option>
                 <option value="needs_guard">需要守护</option>

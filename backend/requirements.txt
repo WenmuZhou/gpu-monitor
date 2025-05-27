@@ -3,3 +3,4 @@ nvidia-smi
 Flask
 Flask-CORS
 Loguru
+fabric
